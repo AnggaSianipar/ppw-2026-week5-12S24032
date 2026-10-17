@@ -5,6 +5,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\KategoriController;
 use App\Http\Controllers\MahasiswaController;
+use App\Http\Controllers\PeminjamanController;
 use Illuminate\Support\Facades\Route;
 //login hanya bisa diakses oleh user yang belum login
 Route::get('/', function () {
@@ -26,8 +27,18 @@ Route::middleware('auth')->group(function (): void {
 //mahasiswa, buku, kategori hanya bisa diakses oleh user dengan role admin
 Route::middleware(['auth', 'role:admin'])->group(function (): void {
     Route::resource('mahasiswa', MahasiswaController::class);
+    Route::get('/mahasiswa/{mahasiswa}/peminjaman', [MahasiswaController::class, 'peminjaman'])
+        ->name('mahasiswa.peminjaman');
     Route::resource('buku', BukuController::class)->except(['index', 'show']);
     Route::resource('kategori', KategoriController::class)->except(['index', 'show']);
+});
+//peminjaman hanya bisa diakses oleh user dengan role admin
+Route::middleware(['auth', 'role:admin'])->group(function (): void {
+    Route::get('/peminjaman', [PeminjamanController::class, 'index'])->name('peminjaman.index');
+    Route::get('/peminjaman/create', [PeminjamanController::class, 'create'])->name('peminjaman.create');
+    Route::post('/peminjaman', [PeminjamanController::class, 'store'])->name('peminjaman.store');
+    Route::patch('/peminjaman/{peminjaman}/return', [PeminjamanController::class, 'return'])
+        ->name('peminjaman.return');
 });
 //mahasiswa hanya bisa read
 Route::middleware('auth')->group(function (): void {
