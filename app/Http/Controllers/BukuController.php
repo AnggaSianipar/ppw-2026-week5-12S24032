@@ -6,17 +6,48 @@ use App\Models\Buku;
 use App\Models\Kategori;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cookie;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 class BukuController extends Controller
 {
-    public function index(): View
+    public function index(Request $request): View
     {
+        $filters = $request->only(['search', 'kategori_id']);
         $bukus = Buku::with('kategori')
+            ->withCount('peminjamans')
+            ->when($request->filled('search'), function ($query) use ($request): void {
+                $search = $request->string('search')->toString();
+                $query->where(function ($query) use ($search): void {
+                    $query->where('judul', 'like', "%{$search}%")
+                        ->orWhere('penulis', 'like', "%{$search}%")
+                        ->orWhere('isbn', 'like', "%{$search}%");
+                });
+            })
+            ->when($request->filled('kategori_id'), function ($query) use ($request): void {
+                $query->where('kategori_id', $request->integer('kategori_id'));
+            })
             ->latest()
-            ->paginate(10);
+            ->paginate(10)
+            ->withQueryString();
 
-        return view('buku.index', compact('bukus'));
+        $kategoris = Kategori::orderBy('nama_kategori')->get();
+        $stats = [
+            'judul' => DB::table('bukus')->count(),
+            'stok' => DB::table('bukus')->sum('stok'),
+            'dipinjam' => DB::table('peminjamans')->where('status', 'dipinjam')->count(),
+            'dikembalikan' => DB::table('peminjamans')->where('status', 'dikembalikan')->count(),
+        ];
+
+        if ($request->filled('search')) {
+            $history = $request->session()->get('riwayat_pencarian', []);
+            array_unshift($history, $request->string('search')->toString());
+            $request->session()->put('riwayat_pencarian', array_slice(array_unique($history), 0, 5));
+            Cookie::queue('sipus_last_search', $request->string('search')->toString(), 60, '/', null, false, true, false, 'lax');
+        }
+
+        return view('buku.index', compact('bukus', 'kategoris', 'stats', 'filters'));
     }
 
     public function create(): View
